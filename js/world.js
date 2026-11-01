@@ -2041,7 +2041,28 @@ class WorldManager {
     return obstacleObj;
   }
 
+  setRankedSeed(seed) {
+    this.rankedSeed = seed == null ? null : RankedCore.normalizeSeed(seed);
+  }
+
+  populateRankedObstacles(chunkZ) {
+    const index = Math.max(0, Math.round((15 - chunkZ) / this.CHUNK_LENGTH));
+    const layout = RankedCore.plan(this.rankedSeed, index);
+    for (const obstacle of layout.obstacles) {
+      const x = this.LANES[obstacle.lane];
+      const z = chunkZ - obstacle.offset;
+      if (obstacle.type === 'train') this.spawnTrain(x, z, false, false);
+      else if (obstacle.type === 'barrier') this.spawnLowBarrier(x, z);
+      else if (obstacle.type === 'luggage') this.spawnStationLuggage(x, z);
+      else if (obstacle.type === 'cones') this.spawnRoadblockCones(x, z);
+    }
+  }
+
   populateObstacles(chunk, chunkZ) {
+    if (this.rankedSeed != null) {
+      this.populateRankedObstacles(chunkZ);
+      return;
+    }
     const patterns = [
       'ONCOMING_EXPRESS',
       'TRAIN_LANE',
