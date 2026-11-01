@@ -16,6 +16,8 @@ class Game {
       GAMEOVER: 'GAMEOVER'
     };
     this.currentState = this.STATE.MENU;
+    this.rankedPractice = false;
+    this.rankedSeed = null;
 
     // Game Metrics
     this.score = 0;
@@ -228,7 +230,7 @@ class Game {
     };
     this.input.onDoubleTap = () => {
       if (this.currentState === this.STATE.PLAYING) {
-        this.player.activateHoverboard();
+        if (!this.rankedPractice) this.player.activateHoverboard();
       }
     };
     this.input.onPauseToggle = () => {
@@ -244,6 +246,12 @@ class Game {
         }
       });
     }
+  }
+
+  startRankedPractice(seed) {
+    this.rankedPractice = true;
+    this.rankedSeed = RankedCore.normalizeSeed(seed);
+    this.startGame();
   }
 
   // Authentic Subway Surfers Intro Sequence (Spray Painting -> Whistle -> Close Chase)
@@ -270,6 +278,9 @@ class Game {
     this.player.reset();
     this.collectibles.clear();
     this.world.clear();
+    this.world.setRankedSeed(this.rankedPractice ? this.rankedSeed : null);
+    // Clear recreated unranked chunks before a seeded run starts.
+    if (this.rankedPractice) this.world.clear();
 
     // Snap camera immediately behind player so no lerp lag or blue void
     this.camera.position.set(0, 3.2, 5.8);
@@ -306,6 +317,9 @@ class Game {
 
   quitToMenu() {
     this.currentState = this.STATE.MENU;
+    this.rankedPractice = false;
+    this.rankedSeed = null;
+    this.world.setRankedSeed(null);
     this.player.reset();
     this.chaser.hide();
     this.collectibles.clear();
@@ -384,6 +398,16 @@ class Game {
 
     this.chaser.triggerCatchAnimation();
 
+    if (this.rankedPractice) {
+      this.ui.showGameOver(this.distance, 0, this.distance, 999999);
+      const revive = document.getElementById('btn-gameover-revive');
+      if (revive) revive.style.display = 'none';
+      const result = document.getElementById('result-score');
+      if (result) result.textContent = Math.floor(this.distance) + 'm · seed ' + this.rankedSeed;
+      return;
+    }
+    const reviveButton = document.getElementById('btn-gameover-revive');
+    if (reviveButton) reviveButton.style.display = '';
     const neededKeys = (this.runReviveCount + 1) * 2;
 
     let shakeCount = 0;
@@ -474,7 +498,7 @@ class Game {
       this.updateEnvironmentalLighting(delta);
 
       // 5. Update Collectibles, Keys, Magnet & Word Hunt
-      this.collectibles.update(
+      if (!this.rankedPractice) this.collectibles.update(
         delta,
         this.player,
         (val) => {
@@ -619,6 +643,13 @@ class Game {
 function launchGame() {
   if (!window.game) {
     window.game = new Game();
+    const rankedButton = document.getElementById('btn-ranked-practice');
+    if (rankedButton) rankedButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const value = window.prompt('Enter a shared course seed (number or word):', '2026');
+      if (value === null) return;
+      window.game.startRankedPractice(value || '2026');
+    });
   }
 }
 
